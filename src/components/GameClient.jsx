@@ -46,30 +46,33 @@ const GameClient = () => {
   }, []);
 
 const handleMessage = useCallback((data) => {
-    console.log('Received WebSocket message:', data);
-    switch (data.type) {
-        case 'GAME_START':
-            console.log('Game start received:', data);
-            setGameState('playing');
-            setMessage('Game started! Make your move.');
-            setError(null);
-            break;
-        case 'GAME_RESULT':
-            console.log('Game result received:', data);
-            setGameState('result');
-            setResult(data);
-            setMessage(getResultMessage(data));
-            setTimeout(() => {
-                setGameState('waiting');
-                setMessage('Waiting for next game...');
-                setResult(null);
-                setSelectedMove(null);
-            }, 3000);
-            break;
-        default:
-            console.log('Unknown message type:', data);
-    }
-  }, []);
+  console.log('Received WebSocket message:', data);
+  switch (data.type) {
+      case 'PING':
+          console.log('Received ping');
+          break;
+      case 'GAME_START':
+          console.log('Game start received:', data);
+          setGameState('playing');
+          setMessage('Game started! Make your move.');
+          setError(null);
+          break;
+      case 'GAME_RESULT':
+          console.log('Game result received:', data);
+          setGameState('result');
+          setResult(data);
+          setMessage(getResultMessage(data));
+          setTimeout(() => {
+              setGameState('waiting');
+              setMessage('Waiting for next game...');
+              setResult(null);
+              setSelectedMove(null);
+          }, 3000);
+          break;
+      default:
+          console.log('Unknown message type:', data);
+  }
+}, []);
 
   const makeMove = (move) => {
     if (gameState !== 'playing' || selectedMove) return;
