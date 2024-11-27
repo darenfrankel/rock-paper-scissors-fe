@@ -8,6 +8,77 @@ const GameClient = () => {
   const [result, setResult] = useState(null);
   const [selectedMove, setSelectedMove] = useState(null);
   const [error, setError] = useState(null);
+  
+  const handleMessage = useCallback((data) => {
+    console.log('Received WebSocket message:', data);
+    try {
+      const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+      
+      switch (parsedData.type) {
+        case 'GAME_START':
+          console.log('Game start received:', parsedData);
+          setGameState('playing');
+          setMessage('Game started! Make your move.');
+          setError(null);
+          break;
+        case 'GAME_RESULT':
+          console.log('Game result received:', parsedData);
+          setGameState('result');
+          setResult(parsedData);
+          setMessage(getResultMessage(parsedData));
+          setTimeout(() => {
+            setGameState('waiting');
+            setMessage('Waiting for next game...');
+            setResult(null);
+            setSelectedMove(null);
+          }, 3000);
+          break;
+        default:
+          console.log('Unknown message type:', parsedData);
+      }
+    } catch (error) {
+      console.error('Error handling message:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    const wsUrl = process.env.REACT_APP_WEBSOCKET_URL;
+    console.log('Connecting to WebSocket:', wsUrl);
+    
+    const websocket = new WebSocket(wsUrl);
+
+    websocket.onopen = () => {
+      console.log('WebSocket connected');
+      setGameState('waiting');
+      setMessage('Waiting for opponent...');
+      setError(null);
+    };
+
+    websocket.onclose = () => {
+      console.log('WebSocket disconnected');
+      setGameState('connecting');
+      setMessage('Connection lost. Reconnecting...');
+      setError('Connection to game server lost');
+    };
+
+    websocket.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      setError('Error connecting to game server');
+    };
+
+    websocket.onmessage = (event) => {
+      console.log('Raw WebSocket message received:', event.data);
+      handleMessage(event.data);
+    };
+
+    setWs(websocket);
+
+    return () => {
+      if (websocket) {
+        websocket.close();
+      }
+    };
+  }, [handleMessage]);
 
   const moveIcons = {
     ROCK: <Square className="w-8 h-8" />,
@@ -15,68 +86,10 @@ const GameClient = () => {
     SCISSORS: <Scissors className="w-8 h-8" />
   };
 
-  useEffect(() => {
-    const wsUrl = process.env.REACT_APP_WEBSOCKET_URL;
-    const websocket = new WebSocket(wsUrl);
-
-    websocket.onopen = () => {
-      setGameState('waiting');
-      setMessage('Waiting for opponent...');
-      setError(null);
-    };
-
-    websocket.onclose = () => {
-      setGameState('connecting');
-      setMessage('Connection lost. Reconnecting...');
-      setError('Connection to game server lost');
-    };
-
-    websocket.onerror = (error) => {
-      setError('Error connecting to game server');
-      console.error('WebSocket error:', error);
-    };
-
-    websocket.onmessage = (event) => handleMessage(JSON.parse(event.data));
-
-    setWs(websocket);
-
-    return () => {
-      websocket.close();
-    };
-  }, []);
-
-const handleMessage = useCallback((data) => {
-  console.log('Received WebSocket message:', data);
-  switch (data.type) {
-      case 'PING':
-          console.log('Received ping');
-          break;
-      case 'GAME_START':
-          console.log('Game start received:', data);
-          setGameState('playing');
-          setMessage('Game started! Make your move.');
-          setError(null);
-          break;
-      case 'GAME_RESULT':
-          console.log('Game result received:', data);
-          setGameState('result');
-          setResult(data);
-          setMessage(getResultMessage(data));
-          setTimeout(() => {
-              setGameState('waiting');
-              setMessage('Waiting for next game...');
-              setResult(null);
-              setSelectedMove(null);
-          }, 3000);
-          break;
-      default:
-          console.log('Unknown message type:', data);
-  }
-}, []);
-
   const makeMove = (move) => {
     if (gameState !== 'playing' || selectedMove) return;
     
+    console.log('Making move:', move);
     setSelectedMove(move);
     ws?.send(JSON.stringify({
       action: 'move',
